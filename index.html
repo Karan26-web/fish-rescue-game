@@ -5623,14 +5623,13 @@ window.addEventListener('resize', () => {
 });
 
 /* ---------- Banner (title) screen voice-over ----------
-   Plays the title narration (instructions/Title- THE FISH MIX-UP.ogg) on the
-   start/banner screen. IMPORTANT: browsers block audible autoplay until the
-   user interacts, so a sound on first paint simply can't play — there is no
-   code fix for that. We therefore (a) best-effort try on load + first gesture
-   (covers browsers/contexts that DO allow it), and (b) guarantee it's heard by
-   playing it on the "Let's Go" tap (a real user gesture) while the banner is
-   still on screen, then starting the tutorial only after it ends so the title
-   line never overlaps the welcome narration. */
+   Plays the title narration (audios/Title- THE FISH MIX-UP.ogg) on the start
+   screen AUTOMATICALLY, ~0.5s after load — never on a stray tap. Caveat:
+   browsers block audible autoplay until the visitor has interacted with the
+   site, so this fires wherever autoplay is permitted (e.g. a returning visitor);
+   where it's blocked it simply stays silent instead of hijacking the first tap.
+   The "Let's Go" tap stops it so the title line never overlaps the tutorial's
+   welcome narration. */
 const voBanner = document.getElementById('voBanner');
 let bannerVoEnded = false;
 if (voBanner) voBanner.addEventListener('ended', () => { bannerVoEnded = true; });
@@ -5645,11 +5644,8 @@ function tryPlayBannerVO() {
     if (p && p.catch) p.catch(() => { /* autoplay blocked — Let's Go will play it */ });
   } catch (_) { /* audio unavailable */ }
 }
-// Best-effort early play (works only where autoplay is permitted).
-tryPlayBannerVO();
-['pointerdown', 'touchstart', 'keydown'].forEach(ev =>
-  window.addEventListener(ev, tryPlayBannerVO, { once: true })
-);
+// Auto-play the title line ~0.5s after the page loads (no tap required).
+setTimeout(tryPlayBannerVO, 500);
 
 startBtn.onclick = () => {
   // Advance immediately so the button always feels responsive — never block
