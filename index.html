@@ -1017,6 +1017,11 @@
 
     text-shadow: 0 1px 2px rgba(94, 47, 18, 0.14);
   }
+  /* While only the leading "But!" is showing (butThenSentence), the sentence is
+     built but hidden. Clip it to one line so it can't drive the box tall at the
+     narrow "But!" width — the box then hugs "But!" in BOTH dimensions. Removed
+     when the sentence grows in. */
+  .speech.but-solo .thought-text { max-height: 1.25em; overflow: hidden; }
 
   /* Word-by-word pop: each word reserves its space up front (opacity 0, so the
      line never reflows) and springs in when JS adds `.in`. Applies to both the
@@ -2783,6 +2788,90 @@ function renderSpeechShape() {
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   path.setAttribute('d', buildBubblePath(W, H, frac, tipDX));
 }
+
+/* ---------- Optimal bubble width ----------
+   The dialogue words are inline-block (for the per-word pop), which defeats CSS
+   `text-wrap: balance` — so left to itself the text wraps greedily, leaving lone
+   "orphan" words and a box wider than the text. fitSpeechWidth instead sizes the
+   box FROM the text: it measures the natural one-line width, picks a line count
+   proportional to the text length, and binary-searches the SMALLEST width that
+   still fits that many lines. The smallest width packs the lines evenly (no
+   orphan) and makes the box hug the text (no dead space) — short lines get a
+   compact box, long lines an appropriately bigger one, all capped per scene. */
+function speechLineCount() {
+  const cs = getComputedStyle(speechText);
+  let lh = parseFloat(cs.lineHeight);
+  if (!isFinite(lh) || lh <= 0) lh = (parseFloat(cs.fontSize) || 16) * 1.2;
+  return Math.max(1, Math.round(speechText.scrollHeight / lh));
+}
+function fitSpeechWidth(anchor) {
+  if (!speech || !speechText) return;
+  const stageW = game.clientWidth || window.innerWidth || 1280;
+  const cs = getComputedStyle(speech);
+  const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+
+  // Per-scene cap (content width), never beyond 46% of the stage.
+  const capPct = (anchor && (anchor.maxWidth != null ? anchor.maxWidth : anchor.width)) || 46;
+  const capContent = Math.max(80, Math.min(capPct / 100, 0.46) * stageW - padX);
+
+  // Save + neutralize constraints so measurement is clean.
+  const sMaxW = speech.style.maxWidth, sW = speech.style.width,
+        sMinW = speech.style.minWidth, sWS = speechText.style.whiteSpace;
+  speech.style.minWidth = '0px';
+
+  // Natural one-line width, then widest single word (the box can't be narrower).
+  speech.style.maxWidth = 'none';
+  speechText.style.whiteSpace = 'nowrap';
+  speech.style.width = 'max-content';
+  const oneLine = Math.ceil(speechText.scrollWidth);
+  speechText.style.whiteSpace = '';
+  speech.style.width = 'min-content';
+  const minWord = Math.ceil(speechText.scrollWidth);
+  speech.style.width = '';                       // back to CSS fit-content
+
+  // Line count proportional to length: aim each line near ~38% of the stage,
+  // but always within the per-scene cap.
+  const comfortLine = Math.max(minWord, Math.min(capContent, 0.38 * stageW));
+  let N = Math.max(1, Math.ceil(oneLine / comfortLine));
+  while (oneLine / N > capContent && N < 6) N++;
+
+  let target;
+  if (N <= 1) {
+    target = Math.min(oneLine, capContent);
+  } else {
+    const linesAt = (wPx) => { speech.style.maxWidth = (wPx + padX) + 'px'; return speechLineCount(); };
+    let lo = Math.max(minWord, oneLine / N - 4);
+    let hi = Math.min(capContent, oneLine);
+    if (linesAt(hi) > N) {
+      target = hi;                               // cap too tight for N lines → accept the cap
+    } else {
+      for (let i = 0; i < 9; i++) {              // smallest width that still fits N lines
+        const mid = (lo + hi) / 2;
+        if (linesAt(mid) <= N) hi = mid; else lo = mid;
+      }
+      target = Math.min(capContent, hi + 1);     // 1px guard against rounding
+    }
+  }
+
+  // Restore, then apply the cap as a % so it scales with the stage on resize.
+  speechText.style.whiteSpace = sWS || '';
+  speech.style.minWidth = sMinW || '';
+  speech.style.width = sW || '';
+  speech.style.maxWidth = ((Math.ceil(target) + padX) / stageW * 100).toFixed(2) + '%';
+}
+// During the "But!" solo beat the box hugs just that one word (its width lands
+// at the min-width floor — word + padding, no dead space); slideOut() then grows
+// it to the sentence. Keeps the dramatic beat without an oversized empty box.
+function fitSpeechToHead(headEl, anchor) {
+  if (!speech || !headEl) return;
+  const stageW = game.clientWidth || window.innerWidth || 1280;
+  const cs = getComputedStyle(speech);
+  const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+  const capPct = (anchor && (anchor.maxWidth != null ? anchor.maxWidth : anchor.width)) || 46;
+  const capContent = Math.max(40, Math.min(capPct / 100, 0.46) * stageW - padX);
+  const c = Math.min(headEl.offsetWidth || 0, capContent);
+  speech.style.maxWidth = ((Math.ceil(c) + padX) / stageW * 100).toFixed(2) + '%';
+}
 // Safety net: redraw whenever the bubble box changes size for ANY reason
 // (text swap, multiline wrap, font load, viewport resize) so the outline always
 // matches the box. Setting the path doesn't change .speech's size, so no loop.
@@ -3287,10 +3376,11 @@ async function playRepeatWordReveal(span, voName, count, totalMs, cancelled) {
 
 // Confused mode: pop "But!", glide it left & fade, then reveal the rest of the
 // sentence word-by-word over the remaining VO.
-async function playButThenSentence(butEl, spans, voName, totalMs, cancelled) {
+async function playButThenSentence(butEl, spans, voName, totalMs, cancelled, onRegrow) {
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const dropHead = () => { const h = butEl && butEl.parentNode; if (h && h.remove) h.remove(); };
-  if (reduceMotion) { dropHead(); revealWords(spans, spans.length); return; }
+  const grow = () => { if (onRegrow) onRegrow(); };   // box: "But!" → full sentence
+  if (reduceMotion) { grow(); dropHead(); revealWords(spans, spans.length); return; }
   const SPLIT = 0.27;            // fraction of the clip where "But!" hands off
   const END = 0.95;              // sentence finishes a touch before the voice
   popEl(butEl, true);
@@ -3299,6 +3389,7 @@ async function playButThenSentence(butEl, spans, voName, totalMs, cancelled) {
     if (slid) return; slid = true;
     butEl.style.animation = 'butOut 420ms ease forwards';
     setTimeout(dropHead, 460);
+    grow();                      // grow the box to the sentence as it reveals
   };
   const voEl = voName ? TUTORIAL_VO[voName] : null;
   if (voEl) {
@@ -3426,7 +3517,7 @@ async function vanishTutorialGuide() {
 function setSpeechFromPreset(preset, typeOpts, anchor) {
   if (!preset) { hideSpeech(); return; }
   const token = ++activeSpeechTypeToken;
-  speech.classList.remove('hidden', 'oops', 'flip');
+  speech.classList.remove('hidden', 'oops', 'flip', 'but-solo');
   // Drop any leftover "But!" overlay from a previous confused scene.
   speech.querySelectorAll('.speech-head').forEach(e => e.remove());
   // Content-sized bubble: a generous max-width cap (per-scene override via
@@ -3446,6 +3537,7 @@ function setSpeechFromPreset(preset, typeOpts, anchor) {
   // Build the content NOW so the bubble is at full size when measured, and
   // pick the reveal routine for this scene's text mode.
   let reveal;
+  let headEl = null;            // the leading "But!" word, for the butThenSentence fit
   if (mode === 'repeatSingleWord') {
     // One word, sized to itself; it pops repeatCount times on the VO beats.
     speechText.textContent = '';
@@ -3457,8 +3549,8 @@ function setSpeechFromPreset(preset, typeOpts, anchor) {
     const count = preset.repeatCount || 3;
     reveal = () => playRepeatWordReveal(span, voName, count, totalMs, cancelled);
   } else if (mode === 'butThenSentence') {
-    // Box is sized to the SENTENCE (after the leading "But!"); the "But!" shows
-    // first as a centered overlay (no layout impact), then hands off.
+    // "But!" gets a solo beat in a box hugging just that word; at the hand-off
+    // (slideOut) the box GROWS to the sentence, so neither state has dead space.
     const parts = preset.text.match(/^(\S+)\s+([\s\S]+)$/);
     const head = parts ? parts[1] : preset.text;
     const rest = parts ? parts[2] : '';
@@ -3471,7 +3563,15 @@ function setSpeechFromPreset(preset, typeOpts, anchor) {
     but.style.opacity = '0';
     headWrap.appendChild(but);
     speech.appendChild(headWrap);
-    reveal = () => playButThenSentence(but, spans, voName, totalMs, cancelled);
+    headEl = but;
+    const regrow = () => {                       // grow box from "But!" to the sentence
+      if (cancelled()) return;
+      speech.classList.remove('but-solo');       // unclip the sentence
+      fitSpeechWidth(anchor);
+      updateSpeechTextLayout();
+      positionSpeechAttachedToGenie(anchor);     // re-center (symmetric grow) + redraw
+    };
+    reveal = () => playButThenSentence(but, spans, voName, totalMs, cancelled, regrow);
   } else {
     const spans = buildWordSpans(speechText, preset.text);
     reveal = () => playWordReveal(spans, voName, totalMs, cancelled);
@@ -3484,6 +3584,10 @@ function setSpeechFromPreset(preset, typeOpts, anchor) {
     // tail/position would be computed against fallback-font sizing.
     if (document.fonts && document.fonts.status !== 'loaded') { try { await document.fonts.ready; } catch (_) {} }
     if (cancelled()) return;
+    // Size the box to the text (balanced wrap). For butThenSentence the box
+    // first hugs "But!"; it grows to the sentence at slideOut (see regrow).
+    if (mode === 'butThenSentence' && headEl) { speech.classList.add('but-solo'); fitSpeechToHead(headEl, anchor); }
+    else fitSpeechWidth(anchor);
     updateSpeechTextLayout();
     positionSpeechAttachedToGenie(anchor);
     // Start the VO here so audio + text begin together, then run the reveal.
@@ -3494,7 +3598,7 @@ function setSpeechFromPreset(preset, typeOpts, anchor) {
 function hideSpeech() {
   activeSpeechTypeToken++;
   speech.classList.add('hidden');
-  speech.classList.remove('oops');
+  speech.classList.remove('oops', 'but-solo');
   speech.querySelectorAll('.speech-head').forEach(e => e.remove());
 }
 
