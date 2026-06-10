@@ -714,8 +714,8 @@
     box-sizing: border-box;
 
     /* Padding is the inner "safe zone" that keeps text off the drawn outline. */
-    padding: clamp(18px, 1.9vw, 38px)
-             clamp(30px, 3.0vw, 62px);
+    padding: clamp(18px, min(1.9vw, 3.38vh), 38px)
+             clamp(30px, min(3.0vw, 5.33vh), 62px);
 
     pointer-events: none;
     overflow: visible;
@@ -747,12 +747,12 @@
     overflow: visible;
     pointer-events: none;
     z-index: -1;
-    filter: drop-shadow(0 0.4vw 0.8vw rgba(62, 35, 8, 0.24));
+    filter: drop-shadow(0 min(0.4vw, 0.71vh) min(0.8vw, 1.42vh) rgba(62, 35, 8, 0.24));
   }
   .speech-shape path {
     fill: #ffffff;
     stroke: #8d5115;
-    stroke-width: clamp(5px, 0.62vw, 12px);   /* thick, and constant at every size */
+    stroke-width: clamp(5px, min(0.62vw, 1.1vh), 12px);   /* thick, constant per stage size */
     vector-effect: non-scaling-stroke;
     stroke-linejoin: round;
     stroke-linecap: round;
@@ -763,8 +763,8 @@
      Width is driven purely by the content + max-width cap, so no word-count
      width classes are needed (they fought the natural sizing). */
   .speech.multiline {
-    padding-top: clamp(18px, 1.9vw, 38px);
-    padding-bottom: clamp(18px, 1.9vw, 38px);
+    padding-top: clamp(18px, min(1.9vw, 3.38vh), 38px);
+    padding-bottom: clamp(18px, min(1.9vw, 3.38vh), 38px);
   }
 
   /* Flip uses the same pop-in: the tail already points back at Gogo via
@@ -1003,7 +1003,7 @@
 
     text-align: center;
     font-family: 'Lilita One', 'Comic Sans MS', 'Chalkboard SE', system-ui, sans-serif;
-    font-size: clamp(24px, 3vw, 52px);
+    font-size: clamp(24px, min(3vw, 5.33vh), 52px);
     font-weight: 400;
     line-height: 1.18;
     letter-spacing: 0.5px;
@@ -1022,6 +1022,9 @@
      narrow "But!" width — the box then hugs "But!" in BOTH dimensions. Removed
      when the sentence grows in. */
   .speech.but-solo .thought-text { max-height: 1.25em; overflow: hidden; }
+  /* Forced single-line scenes (anchor.oneLine) — the text never wraps, the box
+     hugs it. Used only for a few short phrases ("Each stream ...", etc.). */
+  .speech.speech-oneline .thought-text { white-space: nowrap; }
 
   /* Word-by-word pop: each word reserves its space up front (opacity 0, so the
      line never reflows) and springs in when JS adds `.in`. Applies to both the
@@ -1058,7 +1061,7 @@
        font — match .thought-text exactly so "But!" reads at the same size. */
     text-align: center;
     font-family: 'Lilita One', 'Comic Sans MS', 'Chalkboard SE', system-ui, sans-serif;
-    font-size: clamp(24px, 3vw, 52px);
+    font-size: clamp(24px, min(3vw, 5.33vh), 52px);
     font-weight: 400;
     line-height: 1.18;
     letter-spacing: 0.5px;
@@ -1747,17 +1750,21 @@
   .final-victory-title span {
     display: inline-block;
     font-family: 'Lalezar', 'Comic Sans MS', system-ui, sans-serif;
-    font-size: clamp(64px, 8vw, 128px);
+    font-size: clamp(58px, 7.2vw, 116px);
     font-weight: 900;
-    letter-spacing: .03em;
-    color: #ffe37b;
-    -webkit-text-stroke: 10px #7b3a00;
+    letter-spacing: .02em;
+    /* Bright gold letters with a clean brown outline. paint-order draws the
+       stroke BEHIND the fill, so the thick outline frames the glyphs instead of
+       overpainting them (the old look was a muddy brown blob — the 10px stroke
+       ate the fill). Layered shadows give a chunky 3D drop + warm glow. */
+    color: #ffd23b;
+    -webkit-text-stroke: 9px #6e3203;
+    paint-order: stroke fill;
     text-shadow:
-      0 6px 0 #5a2400,
-      0 12px 24px rgba(0,0,0,.35),
-      0 0 20px rgba(255,240,150,.95),
-      0 0 50px rgba(255,210,80,.85),
-      0 0 90px rgba(255,190,50,.55);
+      0 7px 0 #5a2400,
+      0 13px 20px rgba(0,0,0,.30),
+      0 0 26px rgba(255,232,140,.90),
+      0 0 64px rgba(255,200,70,.55);
     animation:
       titleBounce 1.8s ease-in-out infinite,
       titleGlow 2.2s ease-in-out infinite;
@@ -1853,11 +1860,15 @@
   .final-genie {
     position: absolute;
     left: 50%;
-    bottom: 40%;
+    bottom: 35%;                 /* lowered so his head clears the title */
     transform: translateX(-50%);
-    width: 34%;
-    max-width: 520px;
-    min-width: 240px;
+    /* 28% (was 34%) keeps the genie the SAME proportion on every 16:9 size.
+       At 34% the max-width cap only applied on large screens, so on smaller
+       ones he ballooned to ~60% of the stage height and his head rammed the
+       title; ~28% keeps him ~50% tall everywhere, leaving room for the title. */
+    width: 28%;
+    max-width: 560px;
+    min-width: 220px;
     z-index: 8;
     pointer-events: none;
     user-select: none;
@@ -2283,7 +2294,7 @@ const TUTORIAL_SCENES = {
     genie: { pose: 'present', left: 72, bottom: 15, width: 18, bounce: false },
     speech: { text: 'Each stream ...', flip: false },
     pulseStreams: true,
-    bubbleAnchor: { offsetX: 0, offsetY: 0, width: 32 }
+    bubbleAnchor: { offsetX: 0, offsetY: 0, width: 32, oneLine: true }
   },
   leadsToPond: {
     ocean: false,
@@ -2317,7 +2328,7 @@ const TUTORIAL_SCENES = {
     genie: { pose: 'confused', left: 60, bottom: 14, width: 22, bounce: false },
     speech: { text: 'But! They seem confused ...', flip: false, textMode: 'butThenSentence' },
     showCluster: true,
-    bubbleAnchor: { offsetX: 0, offsetY: 0, width: 42 }
+    bubbleAnchor: { offsetX: 0, offsetY: 0, width: 42, oneLine: true }
   },
   thinking: {
     ocean: true,
@@ -2326,7 +2337,7 @@ const TUTORIAL_SCENES = {
     genie: { pose: 'thinking', left: 60, bottom: 14, width: 22, bounce: false },
     speech: { text: '... which way to go?', flip: false },
     showCluster: true,
-    bubbleAnchor: { offsetX: 0, offsetY: 0, width: 34 }
+    bubbleAnchor: { offsetX: 0, offsetY: 0, width: 34, oneLine: true }
   },
   useButtons: {
     ocean: false,
@@ -2375,7 +2386,7 @@ const TUTORIAL_SCENES = {
     highlightButton: 'up',
     handButton: 'up',
     pulseTargetStream: 'green',
-    bubbleAnchor: { offsetX: 0, offsetY: 0, width: 38, headFracY: 0.18 }
+    bubbleAnchor: { offsetX: 0, offsetY: 0, width: 38, headFracY: 0.18, oneLine: true }
   },
   guideCorrect: {
     ocean: false,
@@ -2724,12 +2735,14 @@ function positionSpeechAttachedToGenie(anchor) {
    beak extends below the body (shared with the genie-seating math above).
    The pointer is a CONSTANT size (speechBeakSize): it never scales with the
    bubble's content width, so it can't stretch on big boxes — it only tracks the
-   viewport, like the outline and padding do. */
+   16:9 stage size, like the outline and padding do. */
 function speechBeakSize() {
-  const vw = (window.innerWidth || document.documentElement.clientWidth || 1280) / 100;
+  // Stage-relative (not viewport) so the beak scales with the 16:9 stage even
+  // when it's letterboxed on a wide viewport.
+  const u = ((game && game.clientWidth) || window.innerWidth || 1280) / 100;
   return {
-    tW:    Math.max(54, Math.min(3.8 * vw, 74)),   // beak base width  (~73px @1920)
-    tDrop: Math.max(44, Math.min(3.0 * vw, 58)),   // beak depth/drop  (~58px @1920)
+    tW:    Math.max(54, Math.min(3.8 * u, 74)),   // beak base width  (~73px @1920)
+    tDrop: Math.max(44, Math.min(3.0 * u, 58)),   // beak depth/drop  (~58px @1920)
   };
 }
 function speechTailDrop() { return speechBeakSize().tDrop; }
@@ -2797,8 +2810,18 @@ function renderSpeechShape() {
    proportional to the text length, and binary-searches the SMALLEST width that
    still fits that many lines. The smallest width packs the lines evenly (no
    orphan) and makes the box hug the text (no dead space) — short lines get a
-   compact box, long lines an appropriately bigger one, all capped per scene. */
+   compact box, long lines an appropriately bigger one, auto-sized per text. */
 function speechLineCount() {
+  // Count lines from the words' actual vertical positions. (scrollHeight /
+  // lineHeight over-counted: the inline-block word spans inflate scrollHeight,
+  // so a 1-line bubble read as 2 — which tricked the width search into falling
+  // back to the full per-scene cap, leaving the box far wider than the text.)
+  const words = speechText.querySelectorAll('.type-word, .pop-word');
+  if (words.length) {
+    const tops = new Set();
+    words.forEach(w => tops.add(Math.round(w.offsetTop)));
+    return Math.max(1, tops.size);
+  }
   const cs = getComputedStyle(speechText);
   let lh = parseFloat(cs.lineHeight);
   if (!isFinite(lh) || lh <= 0) lh = (parseFloat(cs.fontSize) || 16) * 1.2;
@@ -2810,9 +2833,30 @@ function fitSpeechWidth(anchor) {
   const cs = getComputedStyle(speech);
   const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
 
-  // Per-scene cap (content width), never beyond 46% of the stage.
-  const capPct = (anchor && (anchor.maxWidth != null ? anchor.maxWidth : anchor.width)) || 46;
-  const capContent = Math.max(80, Math.min(capPct / 100, 0.46) * stageW - padX);
+  // Forced single-line scenes (anchor.oneLine — short phrases that must never
+  // wrap, e.g. "Each stream ...", "... which way to go?", "They seem
+  // confused ..."): size the box to EXACTLY the natural one-line text width
+  // (+ a few px of slack so a rounding subpixel can't trigger a wrap). The box
+  // hugs the text with no dead space and min-width can't pad it out. Every
+  // other bubble falls through to the normal auto-size logic below — unchanged.
+  if (anchor && anchor.oneLine) {
+    // .speech-oneline sets white-space:nowrap on the text, so it physically
+    // cannot wrap (no dependence on font-load timing or sub-pixel rounding).
+    // fit-content + no cap + min-width:0 makes the box hug exactly the one-line
+    // text + padding — no dead space. (padX intentionally unused here.)
+    speech.classList.add('speech-oneline');
+    speech.style.minWidth = '0px';
+    speech.style.maxWidth = 'none';
+    speech.style.width = '';
+    return;
+  }
+
+  // Auto-size every bubble. The small per-scene anchor.width caps forced short
+  // phrases ("Each stream ...", "... which way to go?") to wrap; instead keep a
+  // line on ONE row until it would pass ~54% of the stage, and only let
+  // genuinely long sentences wrap. The box still hugs the text — a one-line
+  // line means the box is exactly the text width (no dead space).
+  const capContent = Math.max(80, 0.54 * stageW - padX);
 
   // Save + neutralize constraints so measurement is clean.
   const sMaxW = speech.style.maxWidth, sW = speech.style.width,
@@ -2829,9 +2873,8 @@ function fitSpeechWidth(anchor) {
   const minWord = Math.ceil(speechText.scrollWidth);
   speech.style.width = '';                       // back to CSS fit-content
 
-  // Line count proportional to length: aim each line near ~38% of the stage,
-  // but always within the per-scene cap.
-  const comfortLine = Math.max(minWord, Math.min(capContent, 0.38 * stageW));
+  // One line until the text would exceed the cap; only then wrap.
+  const comfortLine = Math.max(minWord, capContent);
   let N = Math.max(1, Math.ceil(oneLine / comfortLine));
   while (oneLine / N > capContent && N < 6) N++;
 
@@ -3422,15 +3465,16 @@ async function playButThenSentence(butEl, spans, voName, totalMs, cancelled, onR
 }
 
 // Wrong-condition popup line — its own token so it never collides with the
-// genie speech reveal. The "oops" VO is already playing (started by the popup),
-// so the words pop in step with it.
+// genie speech reveal. Unlike the genie's typewriter, this line appears ALL AT
+// ONCE (the whole line pops in together, not word-by-word); the "oops" VO
+// (started by showWrongConditionPopup) simply narrates over the full line.
 let wrongTypeToken = 0;
-async function typeWrongPanelText(text) {
+function typeWrongPanelText(text) {
   const el = wrongPanelText;
   if (!el) return;
   const token = ++wrongTypeToken;
   const spans = buildWordSpans(el, text);
-  await playWordReveal(spans, TUTORIAL_VO.wrong ? 'wrong' : null, null, () => token !== wrongTypeToken);
+  if (token === wrongTypeToken) spans.forEach(s => s.classList.add('in'));
 }
 function waitForSpeechDone() {
   return activeSpeechDone;
@@ -3517,7 +3561,7 @@ async function vanishTutorialGuide() {
 function setSpeechFromPreset(preset, typeOpts, anchor) {
   if (!preset) { hideSpeech(); return; }
   const token = ++activeSpeechTypeToken;
-  speech.classList.remove('hidden', 'oops', 'flip', 'but-solo');
+  speech.classList.remove('hidden', 'oops', 'flip', 'but-solo', 'speech-oneline');
   // Drop any leftover "But!" overlay from a previous confused scene.
   speech.querySelectorAll('.speech-head').forEach(e => e.remove());
   // Content-sized bubble: a generous max-width cap (per-scene override via
@@ -3526,6 +3570,7 @@ function setSpeechFromPreset(preset, typeOpts, anchor) {
   // legacy ones used maxWidth); honor either. Clear any stale fixed width so
   // fit-content can re-measure from scratch.
   speech.style.width = '';
+  speech.style.minWidth = '';   // clear any inline min-width left by a forced one-line scene
   const widthCapPct = (anchor && (anchor.maxWidth != null ? anchor.maxWidth : anchor.width)) || 46;
   speech.style.maxWidth = widthCapPct + '%';
 
@@ -3577,6 +3622,17 @@ function setSpeechFromPreset(preset, typeOpts, anchor) {
     reveal = () => playWordReveal(spans, voName, totalMs, cancelled);
   }
 
+  // Forced single-line scenes: set nowrap + an uncapped hugging box NOW, before
+  // the async measure pass — so it holds even if the webfont is slow (no
+  // dependence on fonts.ready). butThenSentence does this later (on regrow), so
+  // the "But!" beat keeps its own small box first.
+  if (anchor && anchor.oneLine && mode !== 'butThenSentence') {
+    speech.classList.add('speech-oneline');
+    speech.style.minWidth = '0px';
+    speech.style.maxWidth = 'none';
+    speech.style.width = '';
+  }
+
   activeSpeechDone = (async () => {
     await nextFrame();
     await nextFrame();
@@ -3598,7 +3654,7 @@ function setSpeechFromPreset(preset, typeOpts, anchor) {
 function hideSpeech() {
   activeSpeechTypeToken++;
   speech.classList.add('hidden');
-  speech.classList.remove('oops', 'but-solo');
+  speech.classList.remove('oops', 'but-solo', 'speech-oneline');
   speech.querySelectorAll('.speech-head').forEach(e => e.remove());
 }
 
@@ -4677,16 +4733,15 @@ async function onTutorialFishReachedPond(fish) {
 
     fish.dataset.handling = '0';
 
-    // Freeze the stage so nothing drifts behind the popup, run the
-    // recoil + popup in parallel, then resume after both finish.
+    // Freeze the stage so nothing drifts behind the popup. The push-away recoil
+    // plays FIRST; only after it finishes does the "Oops!" board appear.
     freezeAllMovingFishForWrong();
-    const popupPromise = showWrongConditionPopup(fish.dataset.color).catch(() => {});
 
     inputLocked = true;
     try {
       await pushBackWrongWave(fish);
     } catch (_) { /* recoil errors must not deadlock the tutorial */ }
-    await popupPromise;
+    await showWrongConditionPopup(fish.dataset.color).catch(() => {});
     inputLocked = false;
 
     resumeFishAfterWrongPopup();
@@ -5424,17 +5479,15 @@ async function onFishReachedEnd(fish) {
     // popup card alone communicates which stream the fish belongs in.)
     setStreamTarget(fishColor);
 
-    // Popup runs in parallel with the recoil. We hold input locked
-    // until BOTH finish, so background fish stay frozen the whole
-    // time the popup is visible.
-    const popupPromise = showWrongConditionPopup(fishColor).catch(() => {});
-
+    // The push-away recoil plays FIRST; only after it finishes does the "Oops!"
+    // board appear. Input stays locked and background fish stay frozen the whole
+    // time (through the recoil AND the popup).
     inputLocked = true;
     controls.classList.add('locked');
     try {
       await pushBackWrongWave(fish);
     } catch (_) { /* recoil errors must not deadlock the game */ }
-    await popupPromise;
+    await showWrongConditionPopup(fishColor).catch(() => {});
 
     fish.classList.remove('wrong');
     fish.dataset.handling = '0';
@@ -5669,5 +5722,6 @@ if (retryBtn) {
 
 controls.classList.add('hidden');
 </script>
+<!-- DEV-ONLY screen switcher. Delete this line + debug.js to ship without it. -->
 </body>
 </html>
