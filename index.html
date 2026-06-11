@@ -137,6 +137,10 @@
     right: 0;
     width: auto;
     object-position: center;
+    /* While the destination column is away (ocean-intro), the streams extend to
+       the left edge to fill the space, then retract here as the column slides
+       in. Matches the holes/boxes slide timing so they move in lock-step. */
+    transition: left 540ms cubic-bezier(.34, .02, .2, 1);
   }
   /* The lanes are now <object> SVGs (so their internal animation runs). Strip
      the default object chrome and make sure they never intercept taps meant
@@ -156,6 +160,10 @@
     inset: 0;
     z-index: 4;
     pointer-events: none;
+    /* Slides + fades in lock-step with the ponds (see .game.holes-hidden), so
+       the WHOLE left destination column (colored boxes + circles) arrives as one
+       unit instead of the bare boxes lingering as "lines". */
+    transition: opacity 480ms ease, transform 540ms cubic-bezier(.34, .02, .2, 1);
   }
   .target-box {
     left: 0;
@@ -237,6 +245,7 @@
     overflow: hidden;
     opacity: 0.32;
     mix-blend-mode: screen;
+    transition: left 540ms cubic-bezier(.34, .02, .2, 1);
   }
   .water-wave .band::before,
   .water-wave .band::after {
@@ -305,6 +314,27 @@
     inset: 0;
     z-index: 5;
     pointer-events: none;
+    /* The destination holes slide + fade between the ocean-intro state
+       (hidden, see .game.holes-hidden below) and the gameplay state. The
+       transition is on the CONTAINER only; each .pond keeps its own
+       translateY(-50%) centering, so the slide composes without disturbing
+       layout or collision rects (which settle long before any fish arrives). */
+    transition: opacity 480ms ease, transform 540ms cubic-bezier(.34, .02, .2, 1);
+  }
+  /* OCEAN-INTRO STATE: the whole left destination column (colored boxes + the
+     circular holes) is pushed off to the left and faded out while the ocean
+     crowd is on screen, so NO bare colored "lines" show. Removing the class
+     slides the column back in together ("the destination area arrives"). */
+  .game.holes-hidden .ponds,
+  .game.holes-hidden .target-boxes {
+    opacity: 0;
+    transform: translateX(-46%);
+  }
+  /* ...and the streams + water stretch to the left edge to fill the vacated
+     column, so there's no empty sand gap while the destination icons are away. */
+  .game.holes-hidden .stream-lane,
+  .game.holes-hidden .water-wave .band {
+    left: 0;
   }
   .pond {
     position: absolute;
@@ -947,7 +977,11 @@
     animation: clusterBob 2.6s ease-in-out infinite;
   }
   .cluster-fish.front {
-    width: 9%;
+    /* width is set inline per scene. The wrapper owns the forward glide (left)
+       and the grow (transform: scale via WAAPI) — so the leader can start at the
+       SAME size as the crowd and get bigger as it comes forward. The confused
+       bob lives on the inner art, so bob and grow never fight one transform. */
+    width: 8.8%;
     z-index: 5;
     /* Gentle foreground depth — the pink leader reads as "in front" via
        its larger size, a soft contact shadow and a faint rim light. We
@@ -956,7 +990,14 @@
     filter:
       drop-shadow(0 7px 9px rgba(0,0,0,0.30))
       drop-shadow(0 0 8px rgba(255,255,255,0.45));
-    animation: confusedDrift 2.6s ease-in-out infinite;
+  }
+  .cluster-fish.front .cluster-front-art {
+    position: absolute;
+    inset: 0;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    animation: confusedDrift 2.6s ease-in-out infinite;   /* the confused up/down bob */
   }
   @keyframes clusterBob {
     0%, 100% { transform: translateY(0)    rotate(0deg); }
@@ -964,14 +1005,19 @@
     75%      { transform: translateY(6px)  rotate(2.5deg); }
   }
   /* Front pink leader drifts up and down as if it can't decide which
-     stream to follow. Range tightened so the leader stays inside an
-     "empty" vertical band of the ocean strip and avoids sitting on
-     top of background ocean fish. */
+     stream to follow. translateY is in % of the fish's OWN height (a fixed
+     fraction of the stage), so the sweep stays proportional on every screen
+     size — px would overflow on small stages.
+     The ±170% sweep is deliberately CONTAINED to a central vertical band
+     (≈ strip 18%→68%): the CONFUSED ocean-fish layout below keeps that exact
+     band clear (its keep-out box), so the leader never bobs on top of a
+     background ocean fish. If you change this amplitude, re-measure the
+     leader's swept band and widen `avoid` to match. */
   @keyframes confusedDrift {
-    0%, 100% { transform: translateY(-22px) rotate(-3deg) scale(1.05); }
-    25%      { transform: translateY(-6px)  rotate(1.5deg) scale(1.05); }
-    50%      { transform: translateY(22px)  rotate(3deg)  scale(1.05); }
-    75%      { transform: translateY(-4px)  rotate(-2deg) scale(1.05); }
+    0%, 100% { transform: translateY(-170%) rotate(-6deg) scale(1.05); }
+    25%      { transform: translateY(0%)    rotate(3deg)  scale(1.05); }
+    50%      { transform: translateY(170%)  rotate(6deg)  scale(1.05); }
+    75%      { transform: translateY(0%)    rotate(-3deg) scale(1.05); }
   }
   /* Ocean fish stay visible during the confused-cluster scenes so the
      ocean continues to look consistent across all tutorial screens; the
@@ -1081,6 +1127,52 @@
      =========================================================== */
   .game-transition { position: absolute; inset: 0; z-index: 200; pointer-events: none; overflow: hidden; }
   .game-transition.hidden { display: none; }
+
+  /* Opaque water fill behind the bubbles — guarantees the game screen never
+     shows through gaps. Fades in fast with the wave, holds, fades out as the
+     bubbles recede. Colour matches the bubble palette so it reads as one sheet
+     of water. Single cheap layer (no per-frame filter). */
+  .merge-backdrop {
+    position: absolute; inset: -2%;
+    background: radial-gradient(120% 120% at 50% 38%, #f2fbff 0%, #d6f0fc 45%, #b6e4f7 100%);
+    opacity: 0;
+    will-change: opacity;
+    animation: mergeBackdrop 3s ease both;
+  }
+  @keyframes mergeBackdrop {
+    0%   { opacity: 0; }
+    11%  { opacity: 1; }
+    70%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* ---- Bubble-merge transition ----
+     Many bubbles (the Bubble SVG) stream in from the LEFT and RIGHT edges, meet
+     and cover the whole screen at the centre, hold a beat, then sweep back out
+     the way they came. Each bubble is positioned at its target (left/top) and
+     animated from an off-screen translate (--from) → 0 (covering) → back to
+     --from (receding). Per-bubble --dur/--delay desync the wave. */
+  .merge-bubble {
+    position: absolute;
+    aspect-ratio: 1;                 /* perfect circles regardless of width % */
+    background: center / contain no-repeat;   /* the bubble SVG, set inline */
+    opacity: 0;
+    will-change: transform, opacity;
+    /* NB: no drop-shadow filter here — an animated filter on hundreds of layers
+       re-rasterizes every frame and tanks the framerate. The bubble SVG already
+       carries its own rim/highlight, so it reads fine without a CSS shadow. */
+    animation: mergeBubble var(--dur, 2.6s) cubic-bezier(.45, .05, .3, 1) var(--delay, 0s) both;
+  }
+  @keyframes mergeBubble {
+    0%   { transform: translate(var(--from, -130vw), var(--fromY, 0)) scale(.45); opacity: 0; }
+    12%  { opacity: 1; }
+    42%  { transform: translate(0, 0) scale(1); opacity: 1; }   /* merged — screen covered */
+    62%  { transform: translate(0, 0) scale(1); opacity: 1; }   /* hold */
+    100% { transform: translate(var(--from, -130vw), var(--fromY, 0)) scale(.45); opacity: 0; } /* recede */
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .merge-bubble { animation-duration: 1.2s; }
+  }
   /* Dreamy translucent water that drifts in slowly, lingers, then glides off
      to the left — unhurried and premium, not a fast arcade wipe. */
   .gt-sheet {
@@ -1296,6 +1388,49 @@
     overflow: hidden;
     padding-right: 1.2%;
     box-sizing: border-box;
+    /* Lets the ocean glide away to the right + fade when gameplay begins
+       (see .ocean.ocean-receding). Harmless on the tutorial scenes, which
+       only ever toggle .show. */
+    transition: opacity 520ms ease, transform 560ms cubic-bezier(.34, .02, .2, 1);
+  }
+  /* STATE TRANSITION: once the fish has entered a stream, the ocean section
+     slides off to the right and fades — "the ocean moved away". */
+  .ocean.ocean-receding {
+    opacity: 0;
+    transform: translateX(42%);
+  }
+
+  /* "Selected fish" for the per-round intro. This is an ACTUAL fish lifted out
+     of the ocean crowd (one of the rendered .ocean-fish), reparented onto the
+     stage so it can swim forward out of the pack into the movement column and
+     grow a little, then bob (confused) before the real gameplay fish takes
+     over. Reparenting avoids the ocean layer's overflow clipping. Purely
+     visual — not a gameplay .fish, never counted, no input.
+     • wrapper  → position (left/top) glide + the confused bob (translateY)
+     • inner art → the grow (scale), so bob and grow never fight on one transform */
+  .promoted-fish {
+    position: absolute;
+    aspect-ratio: 860/600;
+    z-index: 11;
+    pointer-events: none;
+    filter: drop-shadow(0 5px 8px rgba(0,0,0,0.28));
+    transition: left 1700ms cubic-bezier(.22, .61, .36, 1),
+                top  1700ms cubic-bezier(.22, .61, .36, 1),
+                opacity 380ms ease;
+  }
+  .promoted-fish.bob { animation: introConfusedBob 1.25s ease-in-out infinite; }
+  .promoted-fish .ocean-fish-art {
+    animation: none;             /* stop the ambient float; the grow is driven via WAAPI in JS */
+    transform-origin: center;    /* grow from the centre so the wrapper centre never moves */
+  }
+  /* Clear up/down "confused" bob (not a tiny wiggle). */
+  @keyframes introConfusedBob {
+    0%, 100% { transform: translateY(-16px) rotate(-4deg); }
+    50%      { transform: translateY(16px)  rotate(4deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .promoted-fish.bob { animation: none; }
+    .promoted-fish .ocean-fish-art { transition: none; }
   }
   .ocean::before {
     content: '';
@@ -1712,47 +1847,73 @@
   }
 
   /* ---- Title: juicy arcade + premium ---- */
+  /* ---- "You Did It!" — white puffy letters on a pink ribbon banner ---- */
   .final-victory-title {
     position: absolute;
-    top: 2.8%;
+    top: 4%;
     left: 50%;
     transform: translateX(-50%);
     z-index: 12;
     text-align: center;
     pointer-events: none;
+    /* The pink ribbon banner body: glossy pink gradient, rounded, with a top
+       sheen, a darker inner bottom edge and a 3D drop so it reads as a raised
+       banner. */
+    padding: clamp(2px, 0.5vw, 9px) clamp(30px, 4.8vw, 90px);
+    border-radius: clamp(16px, 2vw, 32px);
+    background: linear-gradient(180deg, #ff84ba 0%, #f2519a 52%, #e0408a 100%);
+    border: clamp(3px, 0.42vw, 8px) solid #ffdcec;
+    box-shadow:
+      inset 0 clamp(2px, 0.3vw, 5px) 0 rgba(255, 255, 255, .55),
+      inset 0 calc(-1 * clamp(4px, 0.6vw, 9px)) 0 rgba(170, 38, 104, .55),
+      0 clamp(6px, 0.9vw, 12px) 0 #b32f6e,
+      0 clamp(12px, 1.7vw, 24px) clamp(16px, 2.4vw, 34px) rgba(0, 0, 0, .34);
+    animation:
+      bannerBounce 1.8s ease-in-out infinite,
+      titleGlow 2.2s ease-in-out infinite;
+  }
+  /* Folded ribbon tails peeking out behind each end. */
+  .final-victory-title::before,
+  .final-victory-title::after {
+    content: '';
+    position: absolute;
+    bottom: clamp(-22px, -2vw, -38px);
+    width: clamp(28px, 3.4vw, 62px);
+    height: 64%;
+    background: linear-gradient(180deg, #d63f86, #ab2c68);
+    z-index: -1;
+    box-shadow: 0 6px 10px rgba(0, 0, 0, .28);
+  }
+  .final-victory-title::before {
+    left: clamp(-22px, -2.2vw, -42px);
+    clip-path: polygon(0 0, 100% 16%, 72% 50%, 100% 84%, 0 100%);
+  }
+  .final-victory-title::after {
+    right: clamp(-22px, -2.2vw, -42px);
+    clip-path: polygon(100% 0, 0 16%, 28% 50%, 0 84%, 100% 100%);
   }
   .final-victory-title span {
     display: inline-block;
     font-family: 'Lalezar', 'Comic Sans MS', system-ui, sans-serif;
-    font-size: clamp(58px, 7.2vw, 116px);
+    font-size: clamp(50px, 6.6vw, 104px);
     font-weight: 900;
     letter-spacing: .02em;
-    /* Vibrant hot-pink fill so the title POPS off the warm sand (the old flat
-       gold blended in) and contrasts the green genie below it. paint-order keeps
-       the thick brown outline BEHIND the fill so the letters stay bright and
-       framed. A white shine core + pink halo glow read as a celebratory reward.
-       (A gradient fill can't be used here — a thick text-stroke overpaints it on
-       thin letter strokes and turns it muddy; a solid fill stays crisp.) */
-    color: #ff3d8b;
-    -webkit-text-stroke: 9px #6e3203;
+    /* White puffy letters with a thick dark outline (paint-order keeps the
+       outline BEHIND the white fill) + a soft drop so they read off the pink. */
+    color: #ffffff;
+    -webkit-text-stroke: clamp(4px, 0.62vw, 9px) #6e3320;
     paint-order: stroke fill;
     text-shadow:
-      0 7px 0 #5a2400,
-      0 14px 22px rgba(0,0,0,.32),
-      0 0 26px rgba(255,255,255,.65),
-      0 0 60px rgba(255,70,165,.65),
-      0 0 110px rgba(255,120,200,.45);
-    animation:
-      titleBounce 1.8s ease-in-out infinite,
-      titleGlow 2.2s ease-in-out infinite;
+      0 clamp(3px, 0.45vw, 6px) 0 #b8336f,
+      0 clamp(6px, 0.9vw, 12px) clamp(8px, 1.2vw, 16px) rgba(90, 30, 20, .32);
   }
-  @keyframes titleBounce {
-    0%, 100% { transform: translateY(0) scale(1); }
-    50%      { transform: translateY(-12px) scale(1.07); }
+  @keyframes bannerBounce {
+    0%, 100% { transform: translateX(-50%) translateY(0)     scale(1); }
+    50%      { transform: translateX(-50%) translateY(-10px) scale(1.04); }
   }
   @keyframes titleGlow {
     0%, 100% { filter: brightness(1); }
-    50%      { filter: brightness(1.18); }
+    50%      { filter: brightness(1.08); }
   }
 
   /* ---- Slow golden light rays radiating behind Gogo ---- */
@@ -1837,7 +1998,7 @@
   .final-genie {
     position: absolute;
     left: 50%;
-    bottom: 35%;                 /* lowered so his head clears the title */
+    bottom: 22%;                 /* lowered further so he sits well below the title */
     transform: translateX(-50%);
     /* 28% (was 34%) keeps the genie the SAME proportion on every 16:9 size.
        At 34% the max-width cap only applied on large screens, so on smaller
@@ -1948,7 +2109,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .final-pond-screen,
-    .final-victory-title span,
+    .final-victory-title,
     .final-light-rays,
     .final-magic-aura,
     .final-genie-floor-glow,
@@ -2254,6 +2415,10 @@ const TUTORIAL_SCENES = {
     ocean: true,
     vo: 'streamGuide',
     holdMs: 800,
+    // This clip speaks quicker than its length implies, so the default pace let
+    // the voice run ahead of the words. A smaller lead reveals the words faster
+    // so they keep up with the narration on this screen only.
+    typeLead: 0.8,
     // genie-1.png natural orientation has face on the left side of the
     // figure — no flip needed, so on the right side of the stage the
     // genie's face points left toward the streams.
@@ -2377,47 +2542,80 @@ const TUTORIAL_SCENES = {
 
 /* ---------- Deterministic ocean fish placement ----------
    left/top are percentages within the ocean strip (not stage). */
-// A natural, MIXED-UP school (not rigid lanes): seeded-random scatter with a
-// collision check, so the fish look organic yet never overlap. The seed is
-// fixed, so the layout is identical every load. Two fish are safe when they
-// clear sideways (|Δleft| ≥ width + gap) OR vertically (|Δtop| ≥ height + gap).
-// width 30 (a touch smaller than before) gives the horizontal room to scatter.
-function generateOceanFish(count) {
-  const W = 30;                 // fish width, % of the ocean strip
+// A natural, MIXED-UP school that is also BALANCED top-to-bottom and pushed
+// toward the RIGHT, leaving a clear vertical "movement column" on the LEFT (the
+// stream-entrance side) for the selected fish to swim into. Same fish count /
+// density as before — only the distribution changes.
+//   • One fish per horizontal BAND (band = strip-height / count) → no large
+//     vertical gaps; the crowd reads full from top to bottom.
+//   • LEFT_MIN keeps every fish off the stream-entrance edge, so the leftmost
+//     ~17% of the strip stays open (the breathing column).
+//   • Random left within each band + a seeded LCG keeps it scattered (never a
+//     rigid line) yet identical on every load.
+// Two fish are clear when they separate sideways (|Δleft| ≥ W + gap) OR
+// vertically (|Δtop| ≥ H + gap). Verified: 0 overlaps, tops span 6→90 with the
+// largest vertical gap < 9%, lefts spread 18→76 (no two-column lining).
+//
+// opts.seed sets the (deterministic) scatter; opts.avoid {l,r,t,b} is an
+// optional keep-out rectangle (strip %) that no fish may overlap — used by the
+// confused screens to keep the pink leader's bob-zone clear while every other
+// parameter (count, width, banding) stays identical, so the crowd DENSITY reads
+// the same across every ocean screen.
+function generateOceanFish(count, opts) {
+  opts = opts || {};
+  const W = 24;                 // fish width, % of the ocean strip
   const H = W * 0.2084;         // its rendered height as % of the strip height
   const COLORS = ['red', 'yellow', 'green', 'pink'];
-  let seed = 20240611;          // fixed seed → stable scatter
+  let seed = opts.seed || 777;  // fixed seed → stable, hand-verified scatter
   const rnd = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+
+  const LEFT_MIN = 17, LEFT_MAX = 100 - W;   // pushed right; left <17% stays clear
+  const TOP_MIN = 2,  TOP_MAX = 97 - H;
+  const band = (TOP_MAX - TOP_MIN) / count;  // even top-to-bottom coverage
+  const av = opts.avoid;
+  const inAvoid = (L, T) => av && L < av.r && L + W > av.l && T < av.b && T + H > av.t;
+  const clearOf = (L, T) => fish.every(f =>
+    Math.abs(f.left - L) >= W + 2 || Math.abs(f.top - T) >= H + 1.6);
+
   const fish = [];
-  for (let tries = 0; fish.length < count && tries < count * 600; tries++) {
-    const left = +(rnd() * (100 - W)).toFixed(1);
-    const top  = +(1.5 + rnd() * (97 - H)).toFixed(1);
-    const clear = fish.every(f =>
-      Math.abs(f.left - left) >= W + 3 || Math.abs(f.top - top) >= H + 2.2);
-    if (clear) fish.push({ color: COLORS[fish.length % COLORS.length], left, top, width: W });
+  for (let i = 0; i < count; i++) {
+    let left = LEFT_MIN, top = TOP_MIN + i * band, placed = false;
+    // Pass 1: keep the fish inside its own band so coverage stays even.
+    for (let t = 0; t < 240 && !placed; t++) {
+      const L = +(LEFT_MIN + rnd() * (LEFT_MAX - LEFT_MIN)).toFixed(1);
+      const T = +(TOP_MIN + i * band + rnd() * band).toFixed(1);   // jitter within band
+      if (inAvoid(L, T) || !clearOf(L, T)) continue;
+      left = L; top = T; placed = true;
+    }
+    // Pass 2 (rare fallback): widen the vertical search but STILL require no
+    // overlap and respect the keep-out box, so density never breaks down.
+    for (let t = 0; t < 240 && !placed; t++) {
+      const L = +(LEFT_MIN + rnd() * (LEFT_MAX - LEFT_MIN)).toFixed(1);
+      const T = +(TOP_MIN + rnd() * (TOP_MAX - TOP_MIN)).toFixed(1);
+      if (inAvoid(L, T) || !clearOf(L, T)) continue;
+      left = L; top = T; placed = true;
+    }
+    fish.push({ color: COLORS[i % COLORS.length], left, top, width: W });
   }
   return fish;
 }
 const OCEAN_FISH_POSITIONS = generateOceanFish(17);
 
 /* Ocean fish layout used ONLY on the two "confused" narration screens
-   (scenes `confused` and `thinking`). Shifts the background fish so a
-   clear vertical gap opens in the middle of the ocean strip for the big
-   moving pink "leader" fish to drift in. All other screens keep
-   OCEAN_FISH_POSITIONS. */
-const CONFUSED_OCEAN_FISH_POSITIONS = [
-  { color: 'red',    top: 4,  left: 70, width: 30 },
-  { color: 'yellow', top: 13, left: 55, width: 30 },
-  { color: 'red',    top: 23, left: 72, width: 30 },
-  { color: 'yellow', top: 34, left: 55, width: 30 },
-
-  // clear gap for moving big pink fish
-  { color: 'yellow', top: 66, left: 70, width: 30 },
-  { color: 'green',  top: 77, left: 54, width: 30 },
-  { color: 'green',  top: 88, left: 70, width: 30 },
-  { color: 'pink',   top: 98, left: 54, width: 30 },
-  { color: 'red',    top: 108, left: 70, width: 30 }
-];
+   (scenes `confused` and `thinking`). SAME count / width / banding as the
+   default layout (so the crowd density matches every other screen), generated
+   with its own seed and a keep-out box that clears the column the big pink
+   "leader" fish actually sweeps as it bobs up and down (`confusedDrift`).
+   The leader sits on the LEFT of the strip and its ±170% bob spans strip
+   ≈18%→68% vertically and ≈0%→52% horizontally — so the keep-out box pushes
+   every background fish to the RIGHT of / clear of that swept column, and the
+   leader never collides with the crowd while bobbing. Box has margin around
+   the measured sweep. Verified at 16:9: 17 fish, 0 fish-to-fish overlaps,
+   0 fish in the leader's swept column. */
+const CONFUSED_OCEAN_FISH_POSITIONS = generateOceanFish(17, {
+  seed: 158,
+  avoid: { l: 0, r: 54, t: 14, b: 72 }
+});
 
 /* Name of the tutorial scene currently applied (set by applyScene). Used
    to switch ocean fish + moving pink fish into their "confused" layout
@@ -3028,25 +3226,32 @@ function buildFishCluster() {
   // every tutorial screen.
   const front = document.createElement('div');
   front.className = 'cluster-fish front';
-  // Keep the pink leader strictly INSIDE the ocean strip (stage
-  // 82%-100%). Fish width is 8%, so left:88% spans 88-96% with centre
-  // at 92% — well inside the ocean safe zone (centre 86-95%). The
-  // confusedDrift keyframe translates Y only, so the fish can never
-  // drift horizontally out of the ocean. Depth separation is handled
-  // by the boosted foreground glow on .cluster-fish.front and the
-  // softened ocean fish under .fish-cluster.show, NOT by moving the
-  // cluster out of the ocean.
-  if (isConfusedScene()) {
-    // On the confused screens the background fish shift to open a gap, so
-    // the leader sits a touch deeper/right and slightly smaller.
-    front.style.left  = '83.5%';
-    front.style.top   = '52%';
+  // Inner art holds the sprite + the confused bob, so the wrapper is free to
+  // GROW (transform: scale) from the crowd size up — bob and grow never fight.
+  const art = document.createElement('div');
+  art.className = 'cluster-front-art';
+  applyFishArt(art, 'pink');
+  front.appendChild(art);
+  // The leader stays INSIDE the ocean strip. On the "But! They seem confused"
+  // screen it SWIMS IN at its full leader size from the right edge to its bob
+  // spot — a pure forward movement, no scaling/grow. Then it bobs. The glide
+  // runs in showFishCluster (one frame after it's on screen).
+  if (currentSceneName === 'confused') {
+    front.style.left  = '92%';          // start: entering from the right edge
+    front.style.top   = '38%';          // centred so the bob spans the streams
+    front.style.width = '8.8%';
+    front.dataset.forwardLeft = '82%';  // glide target: the breathing column
+  } else if (currentSceneName === 'thinking') {
+    // "... which way to go?" — already out front + full size from the previous
+    // scene, so it just keeps bobbing/thinking (no re-emerge, no re-grow).
+    front.style.left  = '82%';
+    front.style.top   = '38%';
     front.style.width = '8.8%';
   } else {
     front.style.left = '88%';
     front.style.top  = '46%';
+    front.style.width = '8.8%';
   }
-  applyFishArt(front, 'pink');
   fishCluster.appendChild(front);
 }
 function showFishCluster() {
@@ -3055,6 +3260,31 @@ function showFishCluster() {
   // (the confused screens place it differently than the default).
   buildFishCluster();
   fishCluster.classList.add('show');
+  const front = fishCluster.querySelector('.cluster-fish.front');
+  if (!front) return;
+  const target = front.dataset.forwardLeft;
+  const grow   = front.dataset.grow === '1';
+  if (!target && !grow) return;
+  // One frame after it's on screen: glide forward (left) into the stream. The
+  // bob runs on the inner art, so it keeps bobbing throughout. (The optional
+  // grow path below is retained but no scene enables it — the leader swims in
+  // at a constant full size, no upscaling.)
+  const START_SCALE = 0.49;
+  const EMERGE_MS = 1700;                                  // slower, more graceful emerge
+  const EMERGE_EASE = 'cubic-bezier(.22, .61, .36, 1)';    // gentle ease-out (smooth decel)
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (target) {
+      front.style.transition = `left ${EMERGE_MS}ms ${EMERGE_EASE}`;
+      front.style.left = target;
+    }
+    if (grow && front.animate) {
+      front.animate(
+        [{ transform: `scale(${START_SCALE})` }, { transform: 'scale(1)' }],
+        { duration: EMERGE_MS, easing: EMERGE_EASE, fill: 'forwards' }
+      );
+      front.style.transform = 'scale(1)';
+    }
+  }));
 }
 function hideFishCluster() {
   if (!fishCluster) return;
@@ -3127,7 +3357,9 @@ function voDurationMs(name) {
 function sceneTypeOpts(scene) {
   if (!scene || !scene.vo) return undefined;
   const voMs = voDurationMs(scene.vo);
-  return { vo: scene.vo, totalMs: Math.max(600, voMs - 250) };
+  // scene.typeLead (optional) overrides VO_TYPE_LEAD for THIS scene only — a
+  // smaller value reveals the words faster (used where the voice ran ahead).
+  return { vo: scene.vo, totalMs: Math.max(600, voMs - 250), lead: scene.typeLead };
 }
 // Wait until the named VO has finished playing, then a short tail. Reads the
 // live playback position, so it's correct whether the typewriter already
@@ -3315,7 +3547,8 @@ const GRADE1_MIN_WORD_MS = 150;
 // Reveal pre-built `spans` WORD BY WORD in lock-step with audioEl's live
 // playback position, so each word lands as it's spoken. Resolves true once
 // fully shown; false if audio never started (caller falls back to a timer).
-function revealSpansByAudio(spans, audioEl, voName, cancelled) {
+function revealSpansByAudio(spans, audioEl, voName, cancelled, lead) {
+  const L = lead || VO_TYPE_LEAD;   // per-scene pace override (smaller = faster)
   return new Promise(resolve => {
     const words = spans.length;
     let started = false;
@@ -3335,7 +3568,13 @@ function revealSpansByAudio(spans, audioEl, voName, cancelled) {
       }
       const dur = (isFinite(audioEl.duration) && audioEl.duration > 0)
         ? audioEl.duration : voDurationMs(voName) / 1000;
-      const prog = dur > 0 ? Math.min(1, (audioEl.currentTime / dur) / VO_TYPE_LEAD) : 0;
+      // Linear time through the clip, scaled by the lead so words finish a beat early.
+      const t = dur > 0 ? Math.min(1, (audioEl.currentTime / dur) / L) : 0;
+      // First half tracks the voice 1:1 (already well-synced). The SECOND half is
+      // eased so the words reveal a touch faster and don't trail the narrator as
+      // the line finishes. Continuous at the midpoint (both branches pass 0.5).
+      const prog = t <= 0.5 ? t
+        : 0.5 + (1 - Math.pow(1 - (t - 0.5) / 0.5, 1.8)) * 0.5;
       revealWords(spans, Math.round(prog * words));
       if (prog >= 1 || audioEl.ended) { revealWords(spans, words); cleanup(); resolve(true); return; }
       requestAnimationFrame(tick);
@@ -3347,12 +3586,12 @@ function revealSpansByAudio(spans, audioEl, voName, cancelled) {
 // Orchestrate a word-by-word reveal of `spans`: VO-synced when the clip plays,
 // else a comfortable timed cadence. `voName` may be null. The caller STARTS the
 // VO so audio + text begin together.
-async function playWordReveal(spans, voName, totalMs, cancelled) {
+async function playWordReveal(spans, voName, totalMs, cancelled, lead) {
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduceMotion) { revealWords(spans, spans.length); return; }
   const voEl = voName ? TUTORIAL_VO[voName] : null;
   if (voEl) {
-    const ok = await revealSpansByAudio(spans, voEl, voName, cancelled);
+    const ok = await revealSpansByAudio(spans, voEl, voName, cancelled, lead);
     if (cancelled() || ok) return;            // done (or superseded)
     // audio was blocked — fall through to the timed cadence below
   }
@@ -3455,16 +3694,38 @@ async function playButThenSentence(butEl, spans, voName, totalMs, cancelled, onR
 }
 
 // Wrong-condition popup line — its own token so it never collides with the
-// genie speech reveal. Unlike the genie's typewriter, this line appears ALL AT
-// ONCE (the whole line pops in together, not word-by-word); the "oops" VO
-// (started by showWrongConditionPopup) simply narrates over the full line.
+// genie speech reveal. Revealed LINE BY LINE in step with the "oops" VO: the
+// leading "Oops!" pops in first, then the rest of the sentence ("Not the
+// correct stream.") follows a short beat later — a quick one-two that matches
+// how the narrator says it, instead of the whole line appearing at once. All
+// word spans are built up front so the box reserves its full size and nothing
+// reflows when the second line arrives. Words within a line still pop together.
 let wrongTypeToken = 0;
+const WRONG_LINE_GAP_MS = 700;   // "Oops!" beat before the sentence
 function typeWrongPanelText(text) {
   const el = wrongPanelText;
   if (!el) return;
   const token = ++wrongTypeToken;
-  const spans = buildWordSpans(el, text);
-  if (token === wrongTypeToken) spans.forEach(s => s.classList.add('in'));
+  el.textContent = '';
+  const lines = text.split('\n');
+  const lineGroups = lines.map((line, li) => {
+    const words = line.split(/\s+/).filter(Boolean);
+    const group = words.map((word, wi) => {
+      const w = document.createElement('span');
+      w.className = 'type-word';
+      w.textContent = word;
+      el.appendChild(w);
+      if (wi < words.length - 1) el.appendChild(document.createTextNode(' '));
+      return w;
+    });
+    if (li < lines.length - 1) el.appendChild(document.createElement('br'));
+    return group;
+  });
+  lineGroups.forEach((group, li) => {
+    const show = () => { if (token === wrongTypeToken) group.forEach(s => s.classList.add('in')); };
+    if (li === 0) show();
+    else setTimeout(show, li * WRONG_LINE_GAP_MS);
+  });
 }
 function waitForSpeechDone() {
   return activeSpeechDone;
@@ -3567,6 +3828,7 @@ function setSpeechFromPreset(preset, typeOpts, anchor) {
   const cancelled = () => token !== activeSpeechTypeToken;
   const voName = typeOpts && typeOpts.vo;
   const totalMs = typeOpts && typeOpts.totalMs;
+  const lead = typeOpts && typeOpts.lead;   // per-scene word-reveal pace (optional)
   const mode = preset.textMode || 'normal';
 
   // Build the content NOW so the bubble is at full size when measured, and
@@ -3609,7 +3871,7 @@ function setSpeechFromPreset(preset, typeOpts, anchor) {
     reveal = () => playButThenSentence(but, spans, voName, totalMs, cancelled, regrow);
   } else {
     const spans = buildWordSpans(speechText, preset.text);
-    reveal = () => playWordReveal(spans, voName, totalMs, cancelled);
+    reveal = () => playWordReveal(spans, voName, totalMs, cancelled, lead);
   }
 
   // Forced single-line scenes: set nowrap + an uncapped hugging box NOW, before
@@ -3657,6 +3919,7 @@ function showOcean() {
   positions.forEach(p => {
     const wrap = document.createElement('div');
     wrap.className = 'ocean-fish';
+    wrap.dataset.color = p.color;   // lets the round intro promote a matching crowd fish
     wrap.style.width = p.width + '%';
     wrap.style.left  = p.left + '%';
     wrap.style.top   = p.top + '%';
@@ -4956,6 +5219,9 @@ async function runTutorial() {
   activeWaveFish = [activeFish];
   gameOn = true;
   inputLocked = false;
+  // Let the pink fish swim OUT OF the ocean crowd before the lesson (same emerge
+  // as the game rounds).
+  await _tutorialFishEmerge(activeFish, 'pink', 0);
   applyScene('pinkCorrect');
   await waitForSpeechDone();
   game.classList.add('teach-pink');
@@ -5010,6 +5276,8 @@ async function runTutorial() {
   activeWaveFish = [activeFish];
   gameOn = true;
   inputLocked = false;
+  // Let the green fish swim OUT OF the ocean crowd before the lesson.
+  await _tutorialFishEmerge(activeFish, 'green', 3);
   applyScene('tapUp');
   await waitForSpeechDone();
   await delay(2000);
@@ -5058,6 +5326,41 @@ async function runTutorial() {
    anticipation-burst bubbles, sparkles and a soft foam crest. Every element is
    randomized (size / delay / duration / sway) so nothing moves in lock-step.
    Purely decorative (pointer-events:none); cleans itself up after the sweep. */
+/* The Bubble SVG, inlined as a data-URI (no asset file needed): a glossy
+   translucent water bubble with a rim and a highlight. Used for every bubble in
+   the merge transition. */
+const _BUBBLE_RAW =
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>" +
+    "<defs>" +
+      // Body: a soft watery fill that is brightest at the core and fades to a
+      // faint blue rim. Lower opacities so overlapping bubbles blend into a
+      // dreamy foam instead of stacking into opaque white.
+      "<radialGradient id='g' cx='38%' cy='34%' r='66%'>" +
+        "<stop offset='0%' stop-color='#ffffff' stop-opacity='.62'/>" +
+        "<stop offset='42%' stop-color='#e6f7ff' stop-opacity='.30'/>" +
+        "<stop offset='80%' stop-color='#a9def5' stop-opacity='.20'/>" +
+        "<stop offset='100%' stop-color='#6cc1ec' stop-opacity='.14'/>" +
+      "</radialGradient>" +
+      // Highlight: a SOFT-edged glow (radial → transparent) rather than a solid
+      // white oval, so it never reads as a hard dot when many bubbles overlap.
+      "<radialGradient id='h' cx='50%' cy='50%' r='50%'>" +
+        "<stop offset='0%' stop-color='#ffffff' stop-opacity='.8'/>" +
+        "<stop offset='55%' stop-color='#ffffff' stop-opacity='.22'/>" +
+        "<stop offset='100%' stop-color='#ffffff' stop-opacity='0'/>" +
+      "</radialGradient>" +
+    "</defs>" +
+    // Thin, faint rim so overlapping outlines stay soft, not a tangle of hard rings.
+    "<circle cx='50' cy='50' r='47' fill='url(#g)' stroke='#ffffff' stroke-opacity='.32' stroke-width='1.2'/>" +
+    "<ellipse cx='36' cy='31' rx='15' ry='11' fill='url(#h)'/>" +
+  "</svg>";
+const BUBBLE_SVG_URL = 'url("data:image/svg+xml,' + encodeURIComponent(_BUBBLE_RAW) + '")';
+
+/* Bubble transition: a field of DISTINCT, non-overlapping bubbles streams in
+   from the LEFT and RIGHT edges, fills the stage, holds a beat, then sweeps back
+   out the way it came. Each bubble is positioned at its target (left/top) and the
+   CSS keyframe flies it from an off-screen translate (--from) → 0 → back to --from.
+   Edge bubbles arrive first and centre bubbles last, so the field "zips up" toward
+   the middle. Bubbles are spaced so none ever collide. Purely decorative; self-cleans. */
 function playWaterBubbleTransition() {
   const rand = (a, b) => a + Math.random() * (b - a);
   let layer = document.getElementById('gameTransition');
@@ -5069,68 +5372,77 @@ function playWaterBubbleTransition() {
   }
   layer.classList.remove('hidden');
   layer.innerHTML = '';
+  const frag = document.createDocumentFragment();
 
-  const sheet = document.createElement('div');
-  sheet.className = 'gt-sheet';
-  const edge = document.createElement('div');
-  edge.className = 'gt-edge';
-  sheet.appendChild(edge);
+  // Opaque water backdrop BEHIND the bubbles. It fades in with the incoming wave
+  // and out as the bubbles recede, so the game screen is never visible through
+  // any gap between bubbles — the bubbles are translucent, so they alone can't
+  // guarantee full cover. This is what makes the transition fully opaque.
+  const backdrop = document.createElement('div');
+  backdrop.className = 'merge-backdrop';
+  frag.appendChild(backdrop);
 
-  // Background layer — small, blurred, slow (drifts behind for depth).
-  for (let i = 0; i < 16; i++) {
+  const addBubble = (leftPct, topPct, sizePct) => {
     const b = document.createElement('div');
-    b.className = 'gt-bubble bg';
-    const size = rand(0.9, 2.6);
-    b.style.width = size + 'vw'; b.style.height = size + 'vw';
-    b.style.left = rand(2, 98) + '%';
-    b.style.bottom = rand(-12, 18) + '%';
-    b.style.setProperty('--dur', rand(4.2, 6.0).toFixed(2) + 's');   // slower = farther
-    b.style.setProperty('--delay', (-rand(0, 5)).toFixed(2) + 's');  // desync via negative delay
-    b.style.setProperty('--sway', rand(1.0, 2.4).toFixed(2) * (i % 2 ? 1 : -1) + 'vw');
-    sheet.appendChild(b);
-  }
-  // Foreground layer — larger, crisp, a touch faster (closer to the viewer).
-  for (let i = 0; i < 22; i++) {
-    const b = document.createElement('div');
-    b.className = 'gt-bubble fg';
-    const size = rand(2.2, 6.4);
-    b.style.width = size + 'vw'; b.style.height = size + 'vw';
-    b.style.left = rand(0, 100) + '%';
-    b.style.bottom = rand(-16, 14) + '%';
-    b.style.setProperty('--dur', rand(2.8, 4.4).toFixed(2) + 's');
-    b.style.setProperty('--delay', (-rand(0, 4)).toFixed(2) + 's');
-    b.style.setProperty('--sway', rand(1.4, 3.4).toFixed(2) * (i % 2 ? -1 : 1) + 'vw');
-    sheet.appendChild(b);
-  }
-  // A few anticipation-burst bubbles that rise, hold, then pop.
-  for (let i = 0; i < 6; i++) {
-    const b = document.createElement('div');
-    b.className = 'gt-burst';
-    const size = rand(2.6, 5.0);
-    b.style.width = size + 'vw'; b.style.height = size + 'vw';
-    b.style.left = rand(8, 92) + '%';
-    b.style.bottom = rand(-10, 10) + '%';
-    b.style.setProperty('--dur', rand(2.6, 3.6).toFixed(2) + 's');
-    b.style.setProperty('--delay', (-rand(0, 3)).toFixed(2) + 's');
-    b.style.setProperty('--sway', rand(0.8, 2.2).toFixed(2) * (i % 2 ? 1 : -1) + 'vw');
-    sheet.appendChild(b);
-  }
-  // Magical twinkling sparkles, scattered and desynced.
-  for (let i = 0; i < 12; i++) {
-    const s = document.createElement('div');
-    s.className = 'gt-spark';
-    s.textContent = i % 3 === 0 ? '✧' : '✦';
-    s.style.left = rand(6, 94) + '%';
-    s.style.top = rand(8, 88) + '%';
-    s.style.fontSize = rand(1.4, 3.2).toFixed(2) + 'vw';
-    s.style.setProperty('--dur', rand(1.6, 2.8).toFixed(2) + 's');
-    s.style.setProperty('--delay', (-rand(0, 3)).toFixed(2) + 's');
-    sheet.appendChild(s);
+    b.className = 'merge-bubble';
+    b.style.backgroundImage = BUBBLE_SVG_URL;
+    // Quantize the width to a 0.5% grid so the browser rasterizes the bubble SVG
+    // at only ~20 distinct sizes and REUSES those bitmaps across hundreds of
+    // bubbles — that's what lets us run a high bubble count without lag.
+    b.style.width = (Math.round(sizePct * 2) / 2).toFixed(1) + '%';
+    b.style.left = leftPct.toFixed(1) + '%';
+    b.style.top  = topPct.toFixed(1) + '%';
+    // Enter from whichever edge the bubble's centre is nearer to, and recede the
+    // same way. translate is in vw so it always clears the stage off-screen.
+    const cx = leftPct + sizePct / 2;
+    const fromLeft = cx < 50;
+    b.style.setProperty('--from',  (fromLeft ? -rand(110, 155) : rand(110, 155)).toFixed(0) + 'vw');
+    b.style.setProperty('--fromY', rand(-14, 14).toFixed(0) + 'vw');
+    // Edge → centre wave: bubbles nearer the middle arrive (and leave) later, so
+    // they "merge at the centre".
+    const toCentre = 1 - Math.abs(cx - 50) / 50;          // 0 at edges, 1 at centre
+    b.style.setProperty('--delay', (toCentre * 0.42).toFixed(2) + 's');
+    b.style.setProperty('--dur',   rand(2.3, 2.7).toFixed(2) + 's');
+    frag.appendChild(b);
+  };
+
+  // Non-overlapping bubble field. Bubbles are placed by rejection sampling in
+  // PIXEL space: a candidate is kept only if it clears every bubble already
+  // placed by a small gap, so no two bubbles ever collide or merge. Working in
+  // px (not %) keeps the spacing true even though the stage is wider than tall.
+  const rect = layer.getBoundingClientRect();
+  const W = rect.width  || game.clientWidth  || window.innerWidth;
+  const H = rect.height || game.clientHeight || window.innerHeight;
+  const placed = [];                         // {x, y, r} bubble centres + radius, px
+  const GAP   = -W * 0.009;                   // NEGATIVE → bubbles may overlap slightly for a seamless mass
+  const rMin  = W * 0.008, rMax = W * 0.055;  // bubble radii (~1.6%–11% diameter); small ones fill gaps
+  const TARGET = 460;                         // high count; raster reuse (quantized sizes) keeps it smooth
+  let attempts = 0;
+  while (placed.length < TARGET && attempts++ < 55000) {
+    // Place big bubbles first, then progressively much smaller ones so the little
+    // bubbles drop into the gaps the big ones leave. The max size shrinks almost
+    // all the way to rMin by the end, so the final run is fine gap-filler bubbles.
+    const curMax = rMax - (rMax - rMin) * (placed.length / TARGET) * 0.93;
+    const r = rand(rMin, curMax);
+    // Allow a slight spill past each edge so the field reaches the corners.
+    const x = rand(-r * 0.5, W + r * 0.5);
+    const y = rand(-r * 0.5, H + r * 0.5);
+    let clear = true;
+    for (let i = 0; i < placed.length; i++) {
+      const p = placed[i], dx = x - p.x, dy = y - p.y;
+      const min = r + p.r + GAP;
+      if (dx * dx + dy * dy < min * min) { clear = false; break; }
+    }
+    if (!clear) continue;
+    placed.push({ x, y, r });
+    // addBubble wants the top-left corner (left = %width, top = %height) and the
+    // diameter as %width; aspect-ratio:1 then renders a true circle in px.
+    addBubble((x - r) / W * 100, (y - r) / H * 100, (2 * r) / W * 100);
   }
 
-  layer.appendChild(sheet);
-  // Matches the 2.4s dreamy sweep, plus a beat for the tail of the motion.
-  setTimeout(() => { layer.classList.add('hidden'); layer.innerHTML = ''; }, 2500);
+  layer.appendChild(frag);
+  // in (~1.1s) + hold + recede (~1s) ≈ 2.6s, + max delay 0.42s, + a small tail.
+  setTimeout(() => { layer.classList.add('hidden'); layer.innerHTML = ''; }, 3200);
 }
 
 function startMainGame(startLevelIdx = 0) {
@@ -5143,6 +5455,13 @@ function startMainGame(startLevelIdx = 0) {
   hideFishCluster();
   clearStreamTarget();
   stopIdleNudge();
+  // Reset the per-round ocean staging: destination holes start hidden (the
+  // first round's intro reveals them once the fish enters its stream), and any
+  // any leftover promoted intro fish from a previous game is cleared.
+  game.classList.add('holes-hidden');
+  ocean.classList.remove('ocean-receding');
+  ocean.style.opacity = '';
+  if (typeof _clearPromotedFish === 'function') _clearPromotedFish();
   cinematicDim.classList.add('hidden');
   if (gameOverOverlay) gameOverOverlay.classList.add('hidden');
   if (finalPondScreen) finalPondScreen.classList.add('hidden');
@@ -5302,6 +5621,241 @@ function spawnNextFromQueue() {
     // wrong-answer branch below).
   });
 }
+
+/* ============================================================================
+   PER-ROUND OCEAN → STREAM → PONDS STAGING  (presentation only)
+   ----------------------------------------------------------------------------
+   Stages the visuals around each gameplay wave WITHOUT touching any spawn /
+   movement / collision / matching / scoring logic. The original wave spawner
+   is kept verbatim as _spawnWaveCore and still does ALL the real work — we only
+   wrap it so that, before the fish actually enters the stream, the screen sits
+   in the "ocean state" (crowd visible, destination holes hidden), one fish
+   appears to swim out of the crowd and bob, and afterwards the ocean recedes
+   while the holes slide in ("the ocean moved away, the destinations arrived").
+
+   The wrapper is the ONLY thing the rest of the game calls (beginLevel /
+   onFishReachedEnd still call spawnNextFromQueue by name) — reassigning the
+   binding here re-routes every caller through the staging with zero edits to
+   their bodies. Tutorial waves never reach this (the tutorial spawns directly),
+   and an empty queue / re-entrancy falls straight through to the original.
+   ========================================================================== */
+const _spawnWaveCore = spawnNextFromQueue;   // untouched original spawner
+let _roundIntroBusy = false;
+
+// Remove any leftover promoted intro fish (called on game (re)start).
+function _clearPromotedFish() {
+  game.querySelectorAll('.promoted-fish').forEach(el => el.remove());
+}
+
+// At game start a full-screen water-bubble wipe (z-index 200) covers the stage
+// for ~2.5s. The first round's ocean intro must WAIT for that wipe to clear —
+// otherwise the whole emerge + ocean→ponds transition plays hidden behind it
+// and the player never sees it (the game just "appears" mid-play). After the
+// wipe there's nothing to wait on, so every later round starts immediately.
+function _waterWipeActive() {
+  const t = document.getElementById('gameTransition');
+  return !!(t && !t.classList.contains('hidden'));
+}
+async function _waitForWaterWipeToClear() {
+  let guard = 0;
+  while (_waterWipeActive() && guard++ < 80) await delay(60);   // ~4.8s safety cap
+}
+
+// The stage-% LEFT where the promoted crowd fish finishes its swim and the REAL
+// gameplay fish takes over. It's left of the ocean strip (which sits at 82%+),
+// i.e. inside the stream, so the fish visibly leaves the crowd and enters the
+// stream. Same spot + same size at the swap → it reads as ONE continuous fish,
+// never a crowd fish AND a separate fish entering from the right.
+const ROUND_HANDOFF_LEFT = 73;       // stage %
+const GAMEPLAY_FISH_W    = 11.2;     // must match the .fish width (stage %)
+
+// Lift ONE real fish out of the rendered ocean crowd and reparent it onto the
+// stage at the SAME on-screen place/size (reparenting dodges the ocean layer's
+// overflow clipping). It then swims forward out of the pack, GROWING from crowd
+// size up to the gameplay size as it approaches (natural "coming toward you"
+// perspective) and bobbing (confused), ending on the exact box the real fish
+// will occupy at handoff. Prefers a fish of the lead colour near the front of
+// the crowd. Returns the element (or null if the crowd isn't laid out yet).
+function _promoteCrowdFish(color, laneIdx, handoffLeft = ROUND_HANDOFF_LEFT) {
+  if (!oceanFishLayer) return null;
+  const all = Array.from(oceanFishLayer.querySelectorAll('.ocean-fish'));
+  if (!all.length) return null;
+  let cands = all.filter(f => f.dataset.color === color);
+  if (!cands.length) cands = all;
+  cands.sort((a, b) => parseFloat(a.style.left) - parseFloat(b.style.left)); // front-most first
+  const sel = cands[0];
+
+  // Measure its current on-stage rect and convert to stage % before reparenting.
+  const r = sel.getBoundingClientRect();
+  const g = game.getBoundingClientRect();
+  if (!g.width || !g.height || !r.width) return null;
+  const leftPct = (r.left - g.left) / g.width  * 100;
+  const topPct  = (r.top  - g.top)  / g.height * 100;
+  const wPct    = r.width / g.width * 100;
+
+  sel.remove();
+  sel.classList.add('promoted-fish');
+  sel.style.left  = leftPct.toFixed(2) + '%';
+  sel.style.top   = topPct.toFixed(2) + '%';
+  sel.style.width = wPct.toFixed(2) + '%';
+  game.appendChild(sel);
+
+  // End on the EXACT box the real gameplay fish will occupy at handoff. The
+  // inner-art scale grows from the centre (so the wrapper centre never moves),
+  // so we only need to centre-align the wrapper. Grow factor takes crowd size →
+  // gameplay size.
+  const scale   = GAMEPLAY_FISH_W / Math.max(0.5, wPct);
+  const realTop = laneCenterPercent(laneIdx) - DESIGN.fish.centerOffsetY;
+  const ar = 600 / 860, hToStage = 16 / 9;                       // fish aspect, w%→h% of stage
+  const realCx  = handoffLeft + GAMEPLAY_FISH_W / 2;            // real fish visual centre X
+  const realCy  = realTop + (GAMEPLAY_FISH_W * ar * hToStage) / 2;
+  const wrapHpct = wPct * ar * hToStage;
+  const targetLeft = realCx - wPct / 2;                         // centre-align the small wrapper
+  const targetTop  = realCy - wrapHpct / 2;
+  const artEl = sel.querySelector('.ocean-fish-art');
+
+  // After the small crowd-sized fish has painted, swim it forward (left/top) AND
+  // grow it from crowd size (scale 1) up to gameplay size — so it visibly starts
+  // the SAME size as the rest of the crowd and gets bigger as it comes toward
+  // you. The grow uses the Web Animations API (reliable; a plain CSS transition
+  // was collapsing into the first paint and popping straight to full size).
+  const SWIM_MS = 1700;                                   // slower, more graceful emerge from the crowd
+  const SWIM_EASE = 'cubic-bezier(.22,.61,.36,1)';        // gentle ease-out (smooth decel)
+  const opt = { duration: SWIM_MS, easing: SWIM_EASE, fill: 'forwards' };
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    // Swim forward (wrapper left/top) — WAAPI so it actually animates from the
+    // crowd spot instead of snapping to the target.
+    if (sel.animate) {
+      sel.animate([{ left: leftPct.toFixed(2) + '%', top: topPct.toFixed(2) + '%' },
+                   { left: targetLeft.toFixed(2) + '%', top: targetTop.toFixed(2) + '%' }], opt);
+    } else {
+      sel.style.transition = `left ${SWIM_MS}ms ${SWIM_EASE}, top ${SWIM_MS}ms ${SWIM_EASE}`;
+    }
+    sel.style.left = targetLeft.toFixed(2) + '%';   // committed end state (also where WAAPI holds)
+    sel.style.top  = targetTop.toFixed(2) + '%';
+    // Grow (inner art scale 1 → gameplay size) — WAAPI so it visibly starts at
+    // the crowd size and gets bigger as it comes toward you.
+    if (artEl && artEl.animate) {
+      artEl.animate([{ transform: 'scale(1)' }, { transform: `scale(${scale.toFixed(3)})` }], opt);
+      artEl.style.transform = `scale(${scale.toFixed(3)})`;
+    } else if (artEl) {
+      artEl.style.transition = `transform ${SWIM_MS}ms ${SWIM_EASE}`;
+      artEl.style.transform = `scale(${scale.toFixed(3)})`;
+    }
+    sel.classList.add('bob');
+  }));
+  return sel;
+}
+
+// TUTORIAL emerge: make an already-spawned tutorial fish (sitting at left 88 in
+// its lane) appear to swim OUT OF the ocean crowd, exactly like the game rounds.
+// Briefly shows the crowd, a matching crowd fish grows + swims forward to the
+// fish's spot, hands off to the real fish, then the crowd fades. Only the emerge
+// is added — the tutorial's destination icons stay visible as before.
+async function _tutorialFishEmerge(fish, color, laneIdx) {
+  if (!fish) return;
+  fish.style.opacity = '0';                       // hide the real fish; a crowd fish stands in
+  showOcean();
+  await nextFrame(); await nextFrame();
+  const promoted = _promoteCrowdFish(color, laneIdx, 88);   // emerge to the fish's spot (left 88)
+  await delay(promoted ? 2200 : 150);
+  if (promoted) promoted.classList.remove('bob');           // settle so the swap can't pop
+  fish.style.opacity = '';                        // reveal the real fish (same spot + size)
+  if (promoted) promoted.remove();
+  ocean.style.transition = 'opacity 420ms ease';  // gently fade the crowd away
+  ocean.style.opacity = '0';
+  await delay(440);
+  hideOcean();
+  ocean.style.transition = '';
+  ocean.style.opacity = '';
+}
+
+// Per-round intro & state transition. Show the ocean crowd, then for EVERY fish
+// in the wave (1, 2 or 3) lift one real crowd fish out of the pack — each swims
+// forward, grows from crowd size to gameplay size, and bobs (confused) — ending
+// staggered into a school on the exact boxes the real fish will occupy. Then
+// HAND OFF: spawn the real wave (untouched spawner) and snap each real fish onto
+// its promoted counterpart's spot, removing the promoted ones, so the SAME fish
+// continue into the stream (no fish appears separately from the right). Finally
+// the ocean recedes and the destination holes slide in.
+async function _runRoundIntro() {
+  _roundIntroBusy = true;
+  try {
+    const wave = levelWaveQueue[0];          // peek; the core call shifts it
+    if (!wave || !wave.length) { _spawnWaveCore(); return; }
+    const n = wave.length;
+    const slot = _multiFishSlot(n);          // same horizontal spacing the spawner uses
+
+    // Don't run the intro behind the start-of-game water wipe (it would be
+    // invisible). Once the wipe clears, the ocean intro is fully on screen.
+    await _waitForWaterWipeToClear();
+    if (!gameOn) return;
+
+    // STATE 1 — ocean + streams visible, destination holes hidden.
+    game.classList.add('holes-hidden');
+    ocean.classList.remove('ocean-receding');
+    showOcean();
+    ocean.style.opacity = '0';               // quick fade-in for the ocean
+    await nextFrame();
+    ocean.style.opacity = '';
+
+    // Let the crowd lay out, then promote ONE crowd fish per wave fish. Each
+    // ends at a staggered forward spot (lead leftmost, trailing fish behind it)
+    // matching where its real fish will hand off.
+    await nextFrame(); await nextFrame();
+    const handoffLefts = wave.map((_, k) => ROUND_HANDOFF_LEFT + k * slot);
+    const promoted = wave.map((f, k) =>
+      _promoteCrowdFish(f.color, laneIndexOfColor(f.start), handoffLefts[k]));
+    await delay(2450);                       // swim-forward + grow (1700ms) + a couple of bobs
+    if (!gameOn) { _clearPromotedFish(); ocean.classList.remove('ocean-receding'); hideOcean(); return; }
+
+    // Settle the bobs (stops the animation → each wrapper snaps back to its lane
+    // centre) so the swaps can't pop vertically mid-swing.
+    promoted.forEach(p => { if (p) p.classList.remove('bob'); });
+
+    // HANDOFF. Spawn the real wave, then for each fish move it onto its promoted
+    // counterpart's exact box and remove the promoted one, so the same fish
+    // simply continues into the stream. Re-journey from the handoff spot (the
+    // existing helper, constant speed). Falls back to a fade if a promote failed.
+    _spawnWaveCore();
+    for (let k = 0; k < n; k++) {
+      const realFish = activeWaveFish[k];
+      const p = promoted[k];
+      if (realFish && p) {
+        if (realFish.dataset.timer) { clearTimeout(parseInt(realFish.dataset.timer)); realFish.dataset.timer = ''; }
+        _stopCollisionWatch(realFish);
+        realFish.style.transition = 'none';
+        realFish.style.left = handoffLefts[k] + '%';   // lane top already set by spawn
+        realFish.offsetWidth;                           // commit before re-journey
+        p.remove();                                     // identical box underneath → seamless swap
+        startFishJourney(realFish);                     // keep swimming from the handoff spot
+      } else if (p) {
+        p.style.opacity = '0';
+        setTimeout(() => p.remove(), 420);
+      }
+    }
+
+    game.classList.remove('holes-hidden');   // holes slide in from the left
+    ocean.classList.add('ocean-receding');   // ocean glides right + fades
+    await delay(560);
+    hideOcean();
+    ocean.classList.remove('ocean-receding');
+    ocean.style.opacity = '';
+  } finally {
+    _roundIntroBusy = false;
+  }
+}
+
+// Re-route every wave spawn through the staging. Falls through to the original
+// for the tutorial, an empty queue, or a re-entrant call.
+spawnNextFromQueue = function () {
+  if (!gameOn) return;
+  if (_roundIntroBusy || levelWaveQueue.length === 0 || game.classList.contains('tutorial')) {
+    _spawnWaveCore();
+    return;
+  }
+  _runRoundIntro();
+};
 
 function startFishJourney(fish, secondsOverride) {
   if (fish.dataset.timer) clearTimeout(parseInt(fish.dataset.timer));
@@ -5713,6 +6267,6 @@ if (retryBtn) {
 controls.classList.add('hidden');
 </script>
 <!-- DEV-ONLY screen switcher. Delete this line + debug.js to ship without it. -->
- <script src="debug.js"></script>
+
 </body>
 </html>

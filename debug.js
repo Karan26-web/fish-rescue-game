@@ -57,6 +57,11 @@
     game: function (level) {
       resetCommon();
       game.classList.remove('tutorial', 'final-screen-active');
+      // Jumping straight to a level skips the "Let's Go" tap that normally
+      // unlocks audio, so resumeGameplayMusic() would bail (musicStarted=false)
+      // and you'd hear no music. This click IS a user gesture, so unlock + start
+      // the gameplay loop here.
+      if (typeof startBackgroundMusic === 'function') startBackgroundMusic();
       startMainGame(level || 0);
     },
 
