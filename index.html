@@ -1846,74 +1846,117 @@
     pointer-events: none;
   }
 
-  /* ---- Title: juicy arcade + premium ---- */
-  /* ---- "You Did It!" — white puffy letters on a pink ribbon banner ---- */
-  .final-victory-title {
+  /* ===========================================================
+     VICTORY BANNER — "You Did It!"
+     Premium kids-game reward header: blue magical-ocean ribbon with big
+     white 3D text. HTML+CSS only (no images).
+     Everything is sized with min(vw, vh) so it scales with the letterboxed
+     16:9 .game stage — identical proportions on every device, not just 16:9
+     screens. The reveal is driven purely by .final-pond-screen un-hiding
+     (display:none → flex), which restarts these entrance animations once.
+     =========================================================== */
+  .victory-banner {
     position: absolute;
-    top: 4%;
+    top: 3%;
     left: 50%;
-    transform: translateX(-50%);
     z-index: 12;
-    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     pointer-events: none;
-    /* The pink ribbon banner body: glossy pink gradient, rounded, with a top
-       sheen, a darker inner bottom edge and a 3D drop so it reads as a raised
-       banner. */
-    padding: clamp(2px, 0.5vw, 9px) clamp(30px, 4.8vw, 90px);
-    border-radius: clamp(16px, 2vw, 32px);
-    background: linear-gradient(180deg, #ff84ba 0%, #f2519a 52%, #e0408a 100%);
-    border: clamp(3px, 0.42vw, 8px) solid #ffdcec;
-    box-shadow:
-      inset 0 clamp(2px, 0.3vw, 5px) 0 rgba(255, 255, 255, .55),
-      inset 0 calc(-1 * clamp(4px, 0.6vw, 9px)) 0 rgba(170, 38, 104, .55),
-      0 clamp(6px, 0.9vw, 12px) 0 #b32f6e,
-      0 clamp(12px, 1.7vw, 24px) clamp(16px, 2.4vw, 34px) rgba(0, 0, 0, .34);
+    /* Drop-from-top bounce on entrance, then a gentle continuous float.
+       translateX(-50%) is carried in EVERY transform so the banner stays
+       centred through both animations. */
+    transform: translateX(-50%);
     animation:
-      bannerBounce 1.8s ease-in-out infinite,
-      titleGlow 2.2s ease-in-out infinite;
+      victoryDrop  0.9s cubic-bezier(.18,.9,.25,1.35) both,
+      victoryFloat 3.6s ease-in-out 1s infinite;
   }
-  /* Folded ribbon tails peeking out behind each end. */
-  .final-victory-title::before,
-  .final-victory-title::after {
+  /* Soft golden glow halo blooming behind the whole banner. */
+  .victory-banner::before {
     content: '';
     position: absolute;
-    bottom: clamp(-22px, -2vw, -38px);
-    width: clamp(28px, 3.4vw, 62px);
-    height: 64%;
-    background: linear-gradient(180deg, #d63f86, #ab2c68);
-    z-index: -1;
-    box-shadow: 0 6px 10px rgba(0, 0, 0, .28);
+    top: 18%;
+    left: 50%;
+    width: 128%;
+    height: 150%;
+    transform: translateX(-50%);
+    z-index: -2;
+    background: radial-gradient(ellipse at center,
+      rgba(255, 226, 140, .55) 0%,
+      rgba(255, 205, 90, .28) 38%,
+      rgba(255, 190, 60, 0) 70%);
+    filter: blur(6px);
+    pointer-events: none;
+    animation: victoryHalo 2.8s ease-in-out infinite;
   }
-  .final-victory-title::before {
-    left: clamp(-22px, -2.2vw, -42px);
-    clip-path: polygon(0 0, 100% 16%, 72% 50%, 100% 84%, 0 100%);
+
+  /* ---- The blue ribbon body ---- */
+  .victory-ribbon {
+    position: relative;
+    padding: clamp(6px, min(1.1vw, 1.95vh), 18px) clamp(34px, min(5.4vw, 9.6vh), 104px);
+    border-radius: 999px;
+    /* Bright royal-blue ocean gradient with a top sheen. */
+    background:
+      linear-gradient(180deg,
+        rgba(255, 255, 255, .35) 0%, rgba(255, 255, 255, 0) 26%),
+      linear-gradient(180deg, #2a93ff 0%, #0077ff 46%, #004cc9 100%);
+    /* Golden border + layered glow: outer gold aura, a dark-blue 3D drop,
+       an inner top highlight and an inner bottom shade. */
+    border: clamp(3px, min(0.5vw, 0.9vh), 9px) solid #ffd34d;
+    box-shadow:
+      0 0 clamp(10px, min(1.6vw, 2.85vh), 30px) rgba(255, 199, 70, .85),
+      0 0 clamp(22px, min(3.4vw, 6vh), 60px) rgba(255, 199, 70, .45),
+      inset 0 clamp(2px, min(0.32vw, 0.57vh), 6px) 0 rgba(255, 255, 255, .55),
+      inset 0 calc(-1 * clamp(4px, min(0.62vw, 1.1vh), 11px)) 0 rgba(0, 38, 110, .55),
+      0 clamp(6px, min(0.95vw, 1.7vh), 16px) 0 #00337f,
+      0 clamp(12px, min(1.8vw, 3.2vh), 30px) clamp(16px, min(2.5vw, 4.45vh), 40px) rgba(0, 20, 60, .4);
+    z-index: 1;
   }
-  .final-victory-title::after {
-    right: clamp(-22px, -2.2vw, -42px);
-    clip-path: polygon(100% 0, 0 16%, 28% 50%, 0 84%, 100% 100%);
-  }
-  .final-victory-title span {
+  /* ---- Big white 3D "You Did It!" text ---- */
+  .victory-ribbon h1 {
+    margin: 0;
     display: inline-block;
-    font-family: 'Lalezar', 'Comic Sans MS', system-ui, sans-serif;
-    font-size: clamp(50px, 6.6vw, 104px);
-    font-weight: 900;
+    white-space: nowrap;       /* never let the "!" drop to a second line */
+    font-family: 'Lilita One', 'Lalezar', 'Comic Sans MS', system-ui, sans-serif;
+    font-size: clamp(46px, min(6.4vw, 11.4vh), 100px);
+    font-weight: 400;
     letter-spacing: .02em;
-    /* White puffy letters with a thick dark outline (paint-order keeps the
-       outline BEHIND the white fill) + a soft drop so they read off the pink. */
+    line-height: 1.05;
+    /* WHITE letter face. The fill is pinned with -webkit-text-fill-color so the
+       thin navy stroke can't tint it; paint-order keeps the stroke BEHIND the
+       fill. A thin outline (was up to 8px, which ate the fill and made the
+       letters read blue) keeps the white dominant. */
     color: #ffffff;
-    -webkit-text-stroke: clamp(4px, 0.62vw, 9px) #6e3320;
+    -webkit-text-fill-color: #ffffff;
+    -webkit-text-stroke: clamp(2px, min(0.32vw, 0.57vh), 5px) #00337f;
     paint-order: stroke fill;
+    /* Downward navy extrusion for 3D depth + a soft cast shadow underneath. */
     text-shadow:
-      0 clamp(3px, 0.45vw, 6px) 0 #b8336f,
-      0 clamp(6px, 0.9vw, 12px) clamp(8px, 1.2vw, 16px) rgba(90, 30, 20, .32);
+      0 clamp(2px, min(0.3vw, 0.53vh), 5px) 0 #0a4fb8,
+      0 clamp(4px, min(0.55vw, 0.98vh), 9px) 0 #003a92,
+      0 clamp(7px, min(1vw, 1.78vh), 16px) clamp(8px, min(1.2vw, 2.14vh), 18px) rgba(0, 18, 55, .45);
+    animation: victoryTextPop 0.7s cubic-bezier(.2,.9,.3,1.5) 0.45s both;
   }
-  @keyframes bannerBounce {
-    0%, 100% { transform: translateX(-50%) translateY(0)     scale(1); }
-    50%      { transform: translateX(-50%) translateY(-10px) scale(1.04); }
+
+  @keyframes victoryDrop {
+    0%   { transform: translateX(-50%) translateY(-180%) scale(.85); opacity: 0; }
+    55%  { transform: translateX(-50%) translateY(7%)    scale(1.05); opacity: 1; }
+    78%  { transform: translateX(-50%) translateY(-3%)   scale(.99); }
+    100% { transform: translateX(-50%) translateY(0)     scale(1); opacity: 1; }
   }
-  @keyframes titleGlow {
-    0%, 100% { filter: brightness(1); }
-    50%      { filter: brightness(1.08); }
+  @keyframes victoryFloat {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50%      { transform: translateX(-50%) translateY(-2.4%); }
+  }
+  @keyframes victoryHalo {
+    0%, 100% { opacity: .7; transform: translateX(-50%) scale(1); }
+    50%      { opacity: 1;  transform: translateX(-50%) scale(1.06); }
+  }
+  @keyframes victoryTextPop {
+    0%   { transform: scale(.5); opacity: 0; }
+    70%  { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
   }
 
   /* ---- Slow golden light rays radiating behind Gogo ---- */
@@ -2109,7 +2152,9 @@
 
   @media (prefers-reduced-motion: reduce) {
     .final-pond-screen,
-    .final-victory-title,
+    .victory-banner,
+    .victory-banner::before,
+    .victory-ribbon h1,
     .final-light-rays,
     .final-magic-aura,
     .final-genie-floor-glow,
@@ -2117,6 +2162,10 @@
     .magic-particle {
       animation: none !important;
     }
+    /* With animations off, neutralise the entrance transforms so everything
+       sits in its resting (visible, full-size) state. */
+    .victory-banner { transform: translateX(-50%); opacity: 1; }
+    .victory-ribbon h1 { transform: scale(1); opacity: 1; }
     .final-pond-screen { opacity: 1; }
   }
 </style>
@@ -2230,8 +2279,10 @@
     <!-- Slow-rotating golden rays behind Gogo — magical reward, not clutter. -->
     <div class="final-light-rays" aria-hidden="true"></div>
 
-    <div class="final-victory-title">
-      <span>You Did It!</span>
+    <div class="victory-banner" aria-label="You Did It!">
+      <div class="victory-ribbon">
+        <h1>You Did It!</h1>
+      </div>
     </div>
 
     <!-- Soft glow behind Gogo's body + a grounding light circle at his feet. -->
@@ -2409,7 +2460,13 @@ const TUTORIAL_SCENES = {
     holdMs: 700,
     genie: { pose: 'welcome', left: 55, bottom: 8, width: 30, bounce: true },
     speech: { text: 'Welcome!', flip: false, textMode: 'repeatSingleWord', repeatCount: 3 },
-    bubbleAnchor: { offsetX: 0, offsetY: 0, width: 46 }
+    // "Welcome!" is a single word — force it onto one line. Without this it
+    // auto-sizes through fitSpeechWidth, whose box width is a rounded %; on a
+    // device where font metrics/subpixel rounding leave the box a hair short,
+    // `overflow-wrap: anywhere` on .thought-text breaks the word and the "!"
+    // drops to the next line. oneLine sets white-space:nowrap so it physically
+    // cannot wrap on any device.
+    bubbleAnchor: { offsetX: 0, offsetY: 0, width: 46, oneLine: true }
   },
   streamGuide: {
     ocean: true,
